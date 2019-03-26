@@ -90,6 +90,11 @@ namespace PNG_To_Ico
             else
                 pIcon128px.BackColor = Color.FromKnownColor(KnownColor.Control);
 
+            if (selectedIcons[0] || selectedIcons[1] || selectedIcons[2] || selectedIcons[3] || selectedIcons[4] || selectedIcons[5])
+                btnSave.Enabled = true;
+            else
+                btnSave.Enabled = false;
+
         }
 
         private void pbIcon128px_Click(object sender, EventArgs e)
@@ -187,27 +192,34 @@ namespace PNG_To_Ico
             if(size == 16)
             {
                 pbIcon16px.Image = im;
+                selectedIcons[0] = true;
             }
             else if(size == 24)
             {
                 pbIcon24px.Image = im;
+                selectedIcons[1] = true;
             }
             else if(size == 32)
             {
                 pbIcon32px.Image = im;
+                selectedIcons[2] = true;
             }
             else if(size == 48)
             {
                 pbIcon48px.Image = im;
+                selectedIcons[3] = true;
             }
             else if(size == 64)
             {
                 pbIcon64px.Image = im;
+                selectedIcons[4] = true;
             }
             else
             {
                 pbIcon128px.Image = im;
+                selectedIcons[5] = true;
             }
+            drawBorders();
         }
 
         private void SetImage(Image im)
@@ -222,7 +234,7 @@ namespace PNG_To_Ico
             {
                 using (Image tempImage = Image.FromFile(imagePath))
                 {
-                    if (allowedSizes.Contains(tempImage.Height) && allowedSizes.Contains(tempImage.Width) && tempImage.Height == tempImage.Width)
+                    if (allowedSizes.Contains(tempImage.Height) && tempImage.Height == tempImage.Width)
                     {
                         SetImage(tempImage.Height, (Image)tempImage.Clone());
                         //icon.AddImage(tempImage);
