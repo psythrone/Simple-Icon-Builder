@@ -1,0 +1,641 @@
+Things I learned in this project:
+[
+    ICON THINGS
+        icon file is little endian i.e. lsb first
+        the image has an AND mask for legacy reasons (this i knew from last time), 
+        -   the AND mask has it's width padded up to the nearest 32px or 4 bytes (this was news to me and confused me)
+
+    BITMAP THINGS
+        image data is LTR, bottom to top
+        color format is RGBA 
+        the image itself is called the XOR mask, atleast when it comes to icons
+
+    IN GENERAL
+        There is a lot of legacy and useless data that comes in icons using bitmaps, especially in 32bit icons
+        Image width / height is stored twice, once for icon and once for image
+        Image bit depth is also stored multiple times
+        Image resolution is stored in the bitmap data, i.e. how many pixels per meter the image should be printed in
+]
+
+
+
+HEADER:
+. Offset: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+    00 -> 01: HAS to be 0000
+    02 -> 03: 0100 for ICON, 0200 for CURSOR
+    04 -> 05: number of images in file (remember, this is little
+              endian and hex so 1 image is 01 00 and 16 images is 10 00)
+    06 ->   : image library
+
+. Offset: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+Start of WHITE16px.ico:
+00000000: 00 00 01 00 01 00 10 10 00 00 01 00 20 00 68 04    ..............h.
+00000010: 00 00 16 00 00 00 28 00 00 00 10 00 00 00 20 00    ......(.........
+00000020: 00 00 01 00 20 00 00 00 00 00 00 08 00 00 00 00    ................
+00000030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 FF FF    ................
+Start of WHITE24px.ico:
+00000000: 00 00 01 00 01 00 18 18 00 00 01 00 20 00 88 09    ................
+00000010: 00 00 16 00 00 00 28 00 00 00 18 00 00 00 30 00    ......(.......0.
+00000020: 00 00 01 00 20 00 00 00 00 00 00 12 00 00 00 00    ................
+00000030: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 FF FF    ................
+
+
+
+IMAGE LIBRARY:
+. Offset: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+    00      : image width   !!!(00 - FF(255), 00 = 256px)
+    01      : image height  !!!(00 - FF(255), 00 = 256px)
+    02      : palette size (0 for no palette i.e. 32bit)
+    03      : reserved (should be 00)
+    04 -> 05: [?ICO: color in planes (should be 1 or 0)?]
+              [CUR: horizontal offset of hotspot]
+    06 -> 07: [ICO: BPP (0x20 = 2*16=32BPP),(0x18 = 16+8=24BPP i.e. no alpha)]
+              [CUR: vertical offset of hotspot, FROM TOP]
+    08 -> 0B: size of image data in bytes (remember little endian, 1 byte is 01 00 00 00, 256 byte is 00 01 00 00)
+    0C -> 0F: offset of image data from start of file
+
+. Offset: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+Start of WHITE16px.ico without icon header:
+00000000: 10 10 00 00 01 00 20 00 68 04 00 00 16 00 00 00
+00000010: 28 00 00 00 10 00 00 00 20 00 00 00 01 00 20 00 
+00000020: 00 00 00 00 00 08 00 00 00 00 00 00 00 00 00 00 
+00000030: 00 00 00 00 00 00 00 00 FF FF FF FF FF FF FF FF
+Start of WHITE24px.ico without icon header:
+00000000: 18 18 00 00 01 00 20 00 88 09 00 00 16 00 00 00
+00000010: 28 00 00 00 18 00 00 00 30 00 00 00 01 00 20 00
+00000020: 00 00 00 00 00 12 00 00 00 00 00 00 00 00 00 00
+00000030: 00 00 00 00 00 00 00 00 FF FF FF FF FF FF FF FF
+
+
+
+
+
+
+
+
+BITMAP DATA:
+    BITMAPFILEHEADER (not included in icon):
+    . Offset: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+        00 -> 01: Format identifier, use 0x42 0x4D (BM) for windows
+        02 -> 05: Size of file in bytes
+        06 -> 07: RESERVED (for image creation software)
+        08 -> 09: RESERVED (for image creation software)
+        0A -> 0D: Offset of image data from start of file
+
+        BITMAPFILEHEADER is not used in icons since it is not a bitmap file.
+    
+    BITMAPINFOHEADER:
+    . Offset: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+    .         |<-------BITMAPFILEHEADER-------------->| 
+        0E -> 11: Header size (40 bytes)
+        12 -> 15: Image width (signed int)
+        16 -> 19: Image height (signed int)
+        1A -> 1B: Number of color planes (should be 1)
+        1C -> 1D: BPP, typical: 1, 4, 6, 16, 24 or 32
+        1E -> 21: Compression method [0 = BI_RGB (uncompressed, default), 1&2 (RLE 8/4-bit), 
+                                      6 = BI_ALPHABITFIELD (RBGA bit field masks) or others]
+        22 -> 25: Raw image size, can be 0 for BI_RGB
+        26 -> 29: Horizontal res. (px per meter, signed int)
+        2A -> 2D: Vertical res. (px per meter, signed int)
+        2E -> 31: Num of colors in pallete (0 means 2^n (??))
+        32 -> 35: Num of important colors (generally 0 for every color is important)
+
+    BITMAPINFOHEADER (without BITMAPFILEHEADER):
+    . Offset: 00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+        00 -> 03: Header size (40 bytes)
+        04 -> 07: Image width (signed int)
+        08 -> 0B: Image height (signed int)
+        0C -> 0D: Number of color planed (should be 1)
+        0E -> 0F: BPP, typical: 1, 4, 6, 16, 24 or 32
+        10 -> 13: Compression method [0 = BI_RGB (uncompressed, default), 1&2 (RLE 8/4-bit), 
+                                      6 = BI_ALPHABITFIELD (RBGA bit field masks) or others]
+        14 -> 17: Raw image size, can be 0 for BI_RGB
+        18 -> 1B: Horizontal res. (px per meter, signed int)
+        1C -> 1F: Vertical res. (px per meter, signed int)
+        20 -> 23: Num of colors in pallete (0 means 2^n (??))
+        24 -> 27: Num of important colors (generally 0 for every color is important)
+
+
+
+
+
+Start of WHITE16px.bmp:
+00000000: 42 4D 36 03 00 00 00 00 00 00 36 00 00 00 28 00    BM6.......6...(.
+00000010: 00 00 10 00 00 00 10 00 00 00 01 00 18 00 00 00    ................
+00000020: 00 00 00 00 00 00 C4 0E 00 00 C4 0E 00 00 00 00    ......D...D.....
+00000030: 00 00 00 00 00 00 FF FF FF FF FF FF FF FF FF FF    ................
+
+Start of WHITE16px.bmp without BITMAPFILEHEADER:
+00000000: 28 00 00 00 10 00 00 00 10 00 00 00 01 00 18 00
+00000010: 00 00 00 00 00 00 00 00 C4 0E 00 00 C4 0E 00 00
+00000020: 00 00 00 00 00 00 00 00 FF FF FF FF FF FF FF FF
+
+
+
+00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F
+
+00 00 36 00 00 00 28 00 00 00 10 00 00 00 10 00 
+00 00 01 00 18 00 00 00 00 00 00 00 00 00 C4 0E 
+00 00 C4 0E 00 00 00 00 00 00 00 00 00 00 FF FF 
+
+
+
+
+
+
+EXAMPLES:
+    BITMAPS:
+    FILEHEADER:
+        WHITE16px.bmp:
+            00: 00:     42: (B) Windows format
+            01: 01:     4D: (M) /\
+            02: 02:     36: File Size
+            03: 03:     03: /\
+            04: 04:     00: /\
+            05: 05:     00: /\
+            06: 06:     00: RESERVED
+            07: 07:     00: /\
+            08: 08:     00: RESERVED
+            09: 09:     00: /\
+            0A: 0A:     36: Image starts at 0x36 (54)
+            0B: 0B:     00: /\
+            0C: 0C:     00: /\
+            0D: 0D:     00: /\
+    INFOHEADER:
+        WHITE16px.bmp:
+            0E: 00:     28: Header size (0x28 = 16*2 + 8 = 40)
+            0F: 01:     00: /\
+            10: 02:     00: /\
+            11: 03:     00: /\
+            12: 04:     10: Image width (0x10 = 16px)
+            13: 05:     00: /\
+            14: 06:     00: /\
+            15: 07:     00: /\
+            16: 08:     10: Image height (0x10 = 16px)
+            17: 09:     00: /\
+            18: 0A:     00: /\
+            19: 0B:     00: /\
+            1A: 0C:     01: No. of color planes (should be 1)
+            1B: 0D:     00: /\
+            1C: 0E:     18: BPP (0x18 = 16 + 8 = 24bpp)
+            1D: 0F:     00: /\
+            1E: 10:     00: Compression method (0 = BI_RGB, uncompressed)
+            1F: 11:     00: /\
+            20: 12:     00: /\
+            21: 13:     00: /\
+            22: 14:     00: Raw image size, only important for compressed images
+            23: 15:     00: /\
+            24: 16:     00: /\
+            25: 17:     00: /\
+            26: 18:     C4: Horizontal res. (0xEC4 = (14 * 16^2) + (12 * 16) + 4 = 3780px/m)
+            27: 19:     0E: /\                        3584          192        4
+            28: 1A:     00: /\
+            29: 1B:     00: /\
+            2A: 1C:     C4: Vertical res. (0xEC4 = (14 * 16^2) + (12 * 16) + 4 = 3780px/m)
+            2B: 1D:     0E: /\                      3584          192        4
+            2C: 1E:     00: /\
+            2D: 1F:     00: /\
+            2E: 20:     00: No. colors in palette (0 = 2^n)
+            2F: 21:     00: /\
+            30: 22:     00: /\
+            31: 23:     00: /\
+            32: 24:     00: No. important colors (0 = all are important)
+            33: 25:     00: /\
+            34: 26:     00: /\
+            35: 27:     00: /\
+            36: 27:     FF: Pixel array color data start
+
+    ICONS:
+    HEADER:
+        WHITE16px.ico:
+            00: 00  RESERVED
+            01: 00  RESERVED
+            02: 01  01 for ICON, 02 for CURSOR
+            03: 00  /\
+            04: 01  number of images in file
+            05: 00  /\
+
+        WHITE24px.ico:
+            00: 00  RESERVED
+            01: 00  RESERVED
+            02: 01  01 for ICON
+            03: 00  /\
+            04: 01  number of images in file
+            05: 00  /\
+    
+    IMAGE LIBRARY:
+        WHITE16px.ico:
+                Offset:
+            06: 00:     10  width   (0x10 -> 16px)
+            07: 01:     10  height  (0x10 -> 16px)
+            08: 02:     00  palette (0 -> 32bpp)
+            09: 03:     00  RESERVED
+            0A: 04:     01  color in planes (?)
+            0B: 05:     00  /\
+            0C: 06:     20  BPP (0x20 -> 32bpp)
+            0D: 07:     00  /\
+            0E: 08:     68  size in bytes (04 68 -> 1128 bytes)
+            0F: 09:     04  /\
+            10: 0A:     00  /\
+            11: 0B:     00  /\
+            12: 0C:     16  mem offset for image data (image starts at 00000100)
+            13: 0D:     00  /\
+            14: 0E:     00  /\
+            15: 0F:     00  /\
+
+        WHITE24px.ico:
+                Offset:
+            06: 00:     18  width   (0x18 -> 24px)
+            07: 01:     18  height  (0x18 -> 24px)
+            08: 02:     00  palette (0 -> 32bpp)
+            09: 03:     00  RESERVED
+            0A: 04:     01  color in planes (?)
+            0B: 05:     00  /\
+            0C: 06:     20  BPP (0x20 -> 32bpp)
+            0D: 07:     00  /\
+            0E: 08:     88  size in bytes (09 88 -> 2440 bytes)
+            0F: 09:     09  /\
+            10: 0A:     00  /\
+            11: 0B:     00  /\
+            12: 0C:     16  mem offset for image data (image starts at 0x0016)
+            13: 0D:     00  /\
+            14: 0E:     00  /\
+            15: 0F:     00  /\
+
+    FULL ICON HEADER DATA:
+        WHITE16px.ico
+            00:     00  RESERVED
+            01:     00  RESERVED
+            02:     01  01 for ICON, 02 for CURSOR
+            03:     00  /\
+            04:     01  number of images in file
+            05:     00  /\
+            06:     10  width   (0x10 -> 16px)
+            07:     10  height  (0x10 -> 16px)
+            08:     00  palette (0 -> 32bpp)
+            09:     00  RESERVED
+            0A:     01  color in planes (?)
+            0B:     00  /\
+            0C:     20  BPP (0x20 -> 32bpp)
+            0D:     00  /\
+            0E:     68  size in bytes (04 68 -> 1128 bytes)
+            0F:     04  /\
+            10:     00  /\
+            11:     00  /\
+            12:     16  mem offset for image data (image starts at 00000100)
+            13:     00  /\
+            14:     00  /\
+            15:     00  /\
+            16:     28  Bitmap header size (0x28 = 16*2 +8 = 40, should be 40)
+            17:     00  /\
+            18:     00  /\
+            19:     00  /\
+            1A:     10  Image width (0x10 = 16px)
+            1B:     00  /\
+            1C:     00  /\
+            1D:     00  /\
+            1E:     20  Image height (0x20 = 32px IMAGE HEIGHT IS DOUBLED FOR 32BPP)
+            1F:     00  /\
+            20:     00  /\
+            21:     00  /\
+            22:     01  No. color planes (should be 1)
+            23:     00  /\
+            24:     20  BPP (0x20 = 2*16 = 32bpp)
+            25:     00  /\
+            26:     00  Compression method (0 = BI_RGB, uncompressed)
+            27:     00  /\
+            28:     00  /\
+            29:     00  /\
+            2A:     00  Raw image size (0x800 = 8 * 16^2 = 2048)
+            2B:     08  /\
+            2C:     00  /\
+            2D:     00  /\
+            2E:     00  Horizontal res. (0px/m)
+            2F:     00  /\
+            30:     00  /\
+            31:     00  /\
+            32:     00  Vertical res. (0px/m)
+            33:     00  /\
+            34:     00  /\
+            35:     00  /\
+            36:     00  No. colors in palette (0 = 2^n)
+            37:     00  /\
+            38:     00  /\
+            39:     00  /\
+            3A:     00  No.important colors (0 = all are important)
+            3B:     00  /\
+            3C:     00  /\
+            3D:     00  /\
+            3E:     FF  Pixel array color data start
+            3F:     FF  /\ ...
+
+
+
+FULL MULTI ICON [32px, 24px, 16px]:
+    HEADER:
+    0000    00  RESERVED
+    0001    00  RESERVED
+    0002    01  ICON (01 = icon, 02 = cur)
+    0003    00  /\
+    0004    03  No. images in file (3 images)
+    0005    00  /\
+
+    IMAGE LIBRARY:
+        IMG1 32px:
+    0006    20  Width (0x20 = 2*16 = 32px)
+    0007    20  Height (0x20 = 2*16 = 32px)
+    0008    00  Palette (0 = 32bpp)
+    0009    00  RESERVED
+    000A    01  color planes (1)(?)
+    000B    00  /\
+    000C    20  BPP (0x20 = 32bpp)
+    000D    00  /\
+    000E    A8  size in bytes (0x10A8 = 4264byte) [Image(32px*32px*4bpp) + BitampHeader(40) + ANDmask(32px*width(padded to nearest 32))]
+    000F    10  /\
+    0010    00  /\
+    0011    00  /\
+    0012    36  Offset for image data (image starts at 0x36)
+    0013    00  /\
+    0014    00  /\
+    0015    00  /\
+        IMG2 24px:
+    0016    18 Width (0x18 = 24px)
+    0017    18 Height (0x18 = 24px)
+    0018    00 Palette (32bpp)
+    0019    00 RESERVED
+    001A    01 Color planes
+    001B    00 /\
+    001C    20 BPP (32bpp)
+    001D    00 /\
+    001E    88 Size in bytes (0x0988 = 2440) [Image(24px*24px*4bpp) + BitampHeader(40) + ANDmask(24px*width(padded to nearest 32))]
+    001F    09 /\
+    0020    00 /\
+    0021    00 /\
+    0022    DE Offset for image data (0x10DE)
+    0023    10 /\
+    0024    00 /\
+    0025    00 /\
+        IMG3 16px:
+    0026    10  Width (0x10 = 16px)
+    0027    10  Height (0x10 = 16px)
+    0028    00  Palette (32bpp)
+    0029    00  RESERVED
+    002A    01  Color planes
+    002B    00  /\
+    002C    20  BPP (32bpp)
+    002D    00  /\
+    002E    68  Size in bytes (0x0468 = 1128) [Image(16px*16px*4bpp) + BitampHeader(40) + ANDmask(16px*width(padded to nearest 32))]
+    002F    04  /\
+    0030    00  /\
+    0031    00  /\
+    0032    66  Offset for image data (0x1A66)
+    0033    1A  /\
+    0034    00  /\
+    0035    00  /\
+
+    IMAGES:
+        BITMAP1, 32x32px:
+    0036    28  Bitmap header size (0x28 = 40, should be 40)
+    0037    00  /\
+    0038    00  /\
+    0039    00  /\
+    003A    20  Image width (0x20 = 32px)
+    003B    00  /\
+    003C    00  /\
+    003D    00  /\
+    003E    40  Image height (0x40 = 64px HEIGHT IS DOUBLED FOR 32BPP)
+    003F    00  /\
+    0040    00  /\
+    0041    00  /\
+    0042    01  No. color planes (should be 1)
+    0043    00  /\
+    0044    20  BPP (0x20 = 32bpp)
+    0045    00  /\
+    0046    00  Compression method (BI_RGB, uncompressed)
+    0047    00  /\
+    0048    00  /\
+    0049    00  /\
+    004A    00  Raw image size (0x2000 = 8192)
+    004B    20  /\
+    004C    00  /\
+    004D    00  /\
+    004E    00  H. res (0px/m)
+    004F    00  /\
+    0050    00  /\
+    0051    00  /\
+    0052    00  V. res (0px/m)
+    0053    00  /\
+    0054    00  /\
+    0055    00  /\
+    0056    00  No. colors in palette (2^n)
+    0057    00  /\
+    0058    00  /\
+    0059    00  /\
+    005A    00  No. important colors (All)
+    005B    00  /\
+    005C    00  /\
+    005D    00  /\
+    [0x005E ->| 0x105D] IMAGE DATA (All 0xFF) [THIS IS THE XOR MASK]
+    [0x105E ->| 0x10DD] (AND mask? size 0x80 = 8*16 = 4*32)
+
+    BITMAP2 24x24px:
+    10DE    28  Bitmap headeer size (40, ok)
+    10DF    00  /\
+    10E0    00  /\
+    10E1    00  /\
+    10E2    18  Img width (0x18 = 24px)
+    10E3    00  /\
+    10E4    00  /\
+    10E5    00  /\
+    10E6    30  Img height (0x30 = 48px HEIGHT IS DOUBLE FOR 32BPP)
+    10E7    00  /\
+    10E8    00  /\
+    10E9    00  /\
+    10EA    01  No color planes (1)
+    10EB    00  /\
+    10EC    20  BPP (32bpp)
+    10ED    00  /\
+    10EE    00  Compression mode (BI_RGB, uncompressed)
+    10EF    00  /\
+    10F0    00  /\
+    10F1    00  /\
+    10F2    00  Raw img size(0x1200 = 4608)
+    10F3    12  /\
+    10F4    00  /\
+    10F5    00  /\
+    10F6    00  H. res (0)
+    10F7    00  /\
+    10F8    00  /\
+    10F9    00  /\
+    10FA    00  V. res (0)
+    10FB    00  /\
+    10FC    00  /\
+    10FD    00  /\
+    10FE    00  No. colors in palette (2^n)
+    10FF    00  /\
+    1100    00  /\
+    1101    00  /\
+    1102    00  No. important colors (all)
+    1103    00  /\
+    1104    00  /\
+    1105    00  /\
+    [0x1106 ->| 0x1A05] IMAGE DATA (All 0xFF) [THIS IS THE XOR MASK]
+    [0x1A06 ->| 0x1A65] (Probably AND mask, size 0x60 = 6*16 = 4*24)
+
+    BITMAP3 16x16px:
+    1A66    28  Header size (40)
+    1A67    00  /\
+    1A68    00  /\
+    1A69    00  /\
+    1A6A    10  Width (16px)
+    1A6B    00  /\
+    1A6C    00  /\
+    1A6D    00  /\
+    1A6E    20  Height (16px*2 for 32BPP)
+    1A6F    00  /\
+    1A70    00  /\
+    1A71    00  /\
+    1A72    01  Color planes
+    1A73    00  /\
+    1A74    20  BPP (32bpp)
+    1A75    00  /\
+    1A76    00  Compression (Uncompressed)
+    1A77    00  /\
+    1A78    00  /\
+    1A79    00  /\
+    1A7A    00  Raw image size (0x800)
+    1A7B    08  /\
+    1A7C    00  /\
+    1A7D    00  /\
+    1A7E    00  HRes (0px/m)
+    1A7F    00  /\
+    1A80    00  /\
+    1A81    00  /\
+    1A82    00  VRes (0px/m)
+    1A83    00  /\
+    1A84    00  /\
+    1A85    00  /\
+    1A86    00  Colors in palette (2^n)
+    1A87    00  /\
+    1A88    00  /\
+    1A89    00  /\
+    1A8A    00  Important colors (all)
+    1A8B    00  /\
+    1A8C    00  /\
+    1A8D    00  /\
+    [0x1A8E ->| 0x1E8D] IMAGE DATA (All 0xFF) [THIS IS THE XOR MASK]
+    [0x1E8E ->| 0x1ECD] (Probably AND mask, size 0x40 = 4*16)
+    EOF
+
+    QUESTIONS:
+    AND mask ?
+        How does that work?
+
+        - All lines in the AND mask are padded to the nearest multiple of 4 bytes,
+            16px is 2 bytes mask + 2 bytes padding on the right
+            i.e. 80 00 00 00 -> 80 00 is mask and 00 00 is padding
+            24px is 3 bytes mask + 1 byte padding
+            i.e. 80 00 00 00 -> 80 00 00 is mask and 00 is padding
+            there is no padding for 36, 64 and 128px, 256px should be png and is different
+
+AND MASK:
+    LL_WHITE16px.ico:
+00000430:                                           80 00                  x.
+00000440: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000450: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000460: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000470: 00 00 00 00 00 00 00 00 00 00 00 00 00 00          ..............
+    LR_WHITE16px.ico:
+00000430:                                           00 01                  .x
+00000440: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000450: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000460: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000470: 00 00 00 00 00 00 00 00 00 00 00 00 00 00          ..............
+    UL_WHITE16px.ico:
+00000430:                                           00 00                  ..
+00000440: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000450: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000460: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000470: 00 00 00 00 00 00 00 00 00 00 80 00 00 00          ..........x...
+    UR_WHITE16px.ico:
+00000430:                                           00 00                  ..
+00000440: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000450: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000460: 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00    ................
+00000470: 00 00 00 00 00 00 00 00 00 00 00 01 00 00          ...........x..
+    L_WHITE16px.ico:
+00000430:                                           80 00                  x.
+00000440: 00 00 80 00 00 00 80 00 00 00 80 00 00 00 80 00    ..x...x...x...x.
+00000450: 00 00 80 00 00 00 80 00 00 00 80 00 00 00 80 00    ..x...x...x...x.
+00000460: 00 00 80 00 00 00 80 00 00 00 80 00 00 00 80 00    ..x...x...x...x.
+00000470: 00 00 80 00 00 00 80 00 00 00 80 00 00 00          ..x...x...x...
+    L_WHITE24.ico:
+00000930: FF FF FF FF FF FF FF FF FF FF FF FF FF FF 80 00                  x.
+00000940: 00 00 80 00 00 00 80 00 00 00 80 00 00 00 80 00    ..x...x...x...x.
+00000950: 00 00 80 00 00 00 80 00 00 00 80 00 00 00 80 00    ..x...x...x...x.
+00000960: 00 00 80 00 00 00 80 00 00 00 80 00 00 00 80 00    ..x...x...x...x.
+00000970: 00 00 80 00 00 00 80 00 00 00 80 00 00 00 80 00    ..x...x...x...x.
+00000980: 00 00 80 00 00 00 80 00 00 00 80 00 00 00 80 00    ..x...x...x...x.
+00000990: 00 00 80 00 00 00 80 00 00 00 80 00 00 00          ..x...x...x...
+
+    L_WHITE16px.ico:
+        |<------MASK----->| |<----PADDING---->|
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+
+        
+    L_WHITE24.ico:
+        |<----------MASK----------->| |<PADD->|
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+        1000 0000 0000 0000 0000 0000 0000 0000 
+
+
+
+
+
+    00      : image width   !!!(00 - FF(255), 00 = 256px)
+    01      : image height  !!!(00 - FF(255), 00 = 256px)
+    02      : palette size (0 for no palette i.e. 32bit)
+    03      : reserved (should be 00)
+    04 -> 05: [?ICO: color in planes (should be 1 or 0)?]
+              [CUR: horizontal offset of hotspot]
+    06 -> 07: [ICO: BPP (0x20 = 2*16=32BPP),(0x18 = 16+8=24BPP i.e. no alpha)]
+              [CUR: vertical offset of hotspot, FROM TOP]
+    08 -> 0B: size of image data in bytes (remember little endian, 1 byte is 01 00 00 00, 256 byte is 00 01 00 00)
+    0C -> 0F: offset of image data from start of file
