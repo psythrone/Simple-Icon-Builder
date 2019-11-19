@@ -193,31 +193,37 @@ namespace PNG_To_Ico
             {
                 pbIcon16px.Image = im;
                 selectedIcons[0] = true;
+                sizes.Add(16);
             }
             else if(size == 24)
             {
                 pbIcon24px.Image = im;
                 selectedIcons[1] = true;
+                sizes.Add(24);
             }
             else if(size == 32)
             {
                 pbIcon32px.Image = im;
                 selectedIcons[2] = true;
+                sizes.Add(32);
             }
             else if(size == 48)
             {
                 pbIcon48px.Image = im;
                 selectedIcons[3] = true;
+                sizes.Add(48);
             }
             else if(size == 64)
             {
                 pbIcon64px.Image = im;
                 selectedIcons[4] = true;
+                sizes.Add(64);
             }
             else
             {
                 pbIcon128px.Image = im;
                 selectedIcons[5] = true;
+                sizes.Add(128);
             }
             drawBorders();
         }
